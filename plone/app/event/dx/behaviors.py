@@ -241,6 +241,12 @@ class EventRecurrence(object):
 ## Event handlers
 
 def data_postprocessing(obj, event):
+    # newly created object, without start/end/timezone (e.g. invokeFactory()
+    # called without data from add form), ignore event; it will be notified 
+    # again later:
+    if getattr(obj, 'start', None) is None:
+        return
+ 
     # We handle date inputs as floating dates without timezones and apply
     # timezones afterwards.
     start = tzdel(obj.start)
