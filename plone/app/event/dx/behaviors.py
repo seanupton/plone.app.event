@@ -21,6 +21,7 @@ from zope.globalrequest import getRequest
 from zope.interface import alsoProvides
 from zope.interface import implements
 from zope.interface import invariant, Invalid
+from zope.lifecycleevent.interfaces import IObjectCreatedEvent
 
 from plone.app.event import messageFactory as _
 from plone.app.event.base import default_timezone, default_end_dt
@@ -247,6 +248,8 @@ def data_postprocessing(obj, event):
     # again later:
     if getattr(obj, 'start', None) is None:
         return
+ 
+    newly_added = IObjectCreatedEvent.providedBy(event)
 
     # non-form edit/modification notifying ObjectModifiedEvent, in such
     # case, the timezone dance below does not apply, as we assume that
@@ -259,17 +262,19 @@ def data_postprocessing(obj, event):
 
     # get the timezone:
     tz = pytz.timezone(obj.timezone)
-    
+
     # get a list of form variables marked as modified by z3c.form; below
     # we will want to ignore any non-changed values, as normalizing these
     # has adverse consequences
-    form_modified = set(
-        itertools.chain(
-            *[d.attributes for d in event.descriptions]
+    form_modified = set()
+    if not newly_added:
+        form_modified = set(
+            itertools.chain(
+                *[d.attributes for d in event.descriptions]
+                )
             )
-        )
-    start_modified = 'IEventBasic.start' in form_modified
-    end_modified = 'IEventBasic.end' in form_modified
+    start_modified = 'IEventBasic.start' in form_modified or newly_added
+    end_modified = 'IEventBasic.end' in form_modified or newly_added
 
     # Normalize for timezone (only) in the case of form-based edits, and
     # only for fields marked as edited when event was notified.
