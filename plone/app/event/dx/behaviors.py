@@ -2,6 +2,8 @@
 types.
 
 """
+import itertools
+
 from plone.app.dexterity.behaviors.metadata import ICategorization
 from plone.app.textfield import RichText
 from plone.app.textfield.value import RichTextValue
@@ -15,6 +17,7 @@ from Products.CMFCore.utils import getToolByName
 import pytz
 from zope import schema
 from zope.component import adapts
+from zope.globalrequest import getRequest
 from zope.interface import alsoProvides
 from zope.interface import implements
 from zope.interface import invariant, Invalid
@@ -244,25 +247,47 @@ def data_postprocessing(obj, event):
     # again later:
     if getattr(obj, 'start', None) is None:
         return
- 
-    # We handle date inputs as floating dates without timezones and apply
-    # timezones afterwards.
-    start = tzdel(obj.start)
-    end = tzdel(obj.end)
 
-    # set the timezone
+    # non-form edit/modification notifying ObjectModifiedEvent, in such
+    # case, the timezone dance below does not apply, as we assume that
+    # direct edits not via form are set as truly intended UTC-times.
+    request = getRequest()
+    if request is None:
+        return # not form modification
+    if request.method != 'POST' or 'form.buttons.save' not in request.form:
+        return
+
+    # get the timezone:
     tz = pytz.timezone(obj.timezone)
-    start = tz.localize(start)
-    end = tz.localize(end)
+    
+    # get a list of form variables marked as modified by z3c.form; below
+    # we will want to ignore any non-changed values, as normalizing these
+    # has adverse consequences
+    form_modified = set(
+        itertools.chain(
+            *[d.attributes for d in event.descriptions]
+            )
+        )
+    start_modified = 'IEventBasic.start' in form_modified
+    end_modified = 'IEventBasic.end' in form_modified
 
-    # adapt for whole Day
-    if obj.whole_day:
-        start = start.replace(hour=0,minute=0,second=0)
-        end = end.replace(hour=23,minute=59,second=59)
-
-    # save back
-    obj.start = utc(start)
-    obj.end = utc(end)
+    # Normalize for timezone (only) in the case of form-based edits, and
+    # only for fields marked as edited when event was notified.
+    if start_modified:
+        # obj.start was set in local time by form, ajust to save UTC
+        naive_local_start = tzdel(obj.start)
+        local_start = tz.localize(naive_local_start)
+        if obj.whole_day:
+            local_start = local_start.replace(hour=0,minute=0,second=0)
+        obj.start = utc(local_start)  # save correct UTC value back
+    
+    if end_modified:
+        # obj.end was set in local time by form, adjust to save UTC 
+        naive_local_end = tzdel(obj.end)
+        local_end = tz.localize(naive_local_end)
+        if obj.whole_day:
+            local_end = local_end.replace(hour=23,minute=59,second=59)
+        obj.end = utc(local_end)  # save correct UTC value back
 
     # reindex
     obj.reindexObject()
