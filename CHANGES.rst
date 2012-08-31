@@ -4,6 +4,10 @@ Changelog
 1.0a3 (unreleased)
 ------------------
 
+- event_view JavaScript normalization of displayed dates to the timezone
+  ofset of the user's browser.
+  [seanupton]
+
 - Moved docs/HISTORY.rst to CHANGES.txt.
   [seanupton]
 
