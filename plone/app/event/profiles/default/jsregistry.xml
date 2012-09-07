@@ -3,7 +3,7 @@
 
   <javascript
       cacheable="True"
-      compression="safe"
+      compression="none"
       cookable="False"
       enabled="True"
       id="++resource++plone.app.event/event.js"
