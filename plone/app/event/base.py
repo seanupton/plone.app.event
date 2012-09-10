@@ -108,7 +108,7 @@ def get_portal_events(context, range_start=None, range_end=None, limit=None,
         # limit to the current navigation root, usually (not always) site
         portal = getSite()
         navroot = getNavigationRootObject(context, portal)
-        query['path'] = navroot.getPhysicalPath()
+        query['path'] = '/'.join(navroot.getPhysicalPath())
 
     if range_start:
         query['end'] = {'query': DT(range_start), 'range': 'min'}
